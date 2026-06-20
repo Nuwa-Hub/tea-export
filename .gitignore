@@ -3,6 +3,9 @@
 __pycache__/
 *.pyc
 
+# Trained model artifacts (regenerate via POST /api/train). Sample data CSV/XLSX IS committed.
+backend/models/
+
 # Node / frontend
 node_modules/
 dist/

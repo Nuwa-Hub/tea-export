@@ -1,75 +1,77 @@
 """
-Synthetic ("dummy") monthly Sri Lankan tea-export dataset.
+Sample dataset handling.
 
-This stands in for the real series you will later download from the
-Sri Lanka Tea Board / Tea Exporters Association / Central Bank:
+Instead of regenerating data on every run, the synthetic series is written
+ONCE to disk as CSV (and XLSX) and then loaded from that file:
 
-    - auction_price_usd : Colombo auction FOB price, USD per kg
-    - export_volume_kg  : total monthly export volume, kg
-    - usd_lkr           : USD/LKR exchange rate (month average)
+    backend/data/tea_export.csv
+    backend/data/tea_export.xlsx
 
-The numbers are generated with a fixed seed so every run is reproducible.
-Each series is trend + seasonality + mild noise, which gives the LSTM
-something realistic to learn (an upward drift plus a yearly cycle).
+Columns:
+    date              first day of the month (YYYY-MM-DD)
+    auction_price_usd Colombo auction FOB price, USD per kg
+    export_volume_kg  total monthly export volume, kg
+    usd_lkr           USD/LKR exchange rate (month average)
 
-Replace `generate_dataset()` with a CSV loader when you have real data:
+To (re)generate the sample files:
 
-    df = pd.read_csv("tea_export.csv", parse_dates=["date"])
+    cd backend && python -m app.data
+
+To plug in REAL data later, just replace tea_export.csv with your own file
+(same column names) — nothing else changes.
 """
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-# Fixed seed -> identical dataset on every run (important for a demo / paper).
+# Fixed seed -> identical dataset every time it is generated.
 _SEED = 42
-
-# Series span: Jan 2016 .. Dec 2024 (108 monthly observations).
 START = "2016-01-01"
 N_MONTHS = 108
 
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+CSV_PATH = DATA_DIR / "tea_export.csv"
+XLSX_PATH = DATA_DIR / "tea_export.xlsx"
+
 
 def generate_dataset() -> pd.DataFrame:
-    """Return a monthly DataFrame indexed 0..N-1 with a `date` column."""
+    """Build the synthetic monthly dataset in memory (trend + season + noise)."""
     rng = np.random.default_rng(_SEED)
     dates = pd.date_range(START, periods=N_MONTHS, freq="MS")
     t = np.arange(N_MONTHS)
 
-    # Month-of-year (0..11) drives the seasonal component.
     month = dates.month.to_numpy()
     season = np.sin(2 * np.pi * (month - 1) / 12)      # peaks mid-year
     season2 = np.cos(2 * np.pi * (month - 1) / 12)
 
-    # --- Auction price (USD/kg): slow upward trend + season + noise ---
+    # Auction price (USD/kg): slow upward trend + season + noise
     price = (
         4.30
-        + 0.012 * t                       # ~ +1.2 cents/month long-run drift
+        + 0.012 * t
         + 0.25 * season
         + 0.10 * season2
         + rng.normal(0, 0.08, N_MONTHS)
     )
 
-    # --- Export volume (kg): higher in peak season, gentle growth ---
+    # Export volume (kg): higher in peak season, gentle growth
     volume = (
         20_000
-        + 35 * t                          # gentle growth
+        + 35 * t
         + 2_500 * season
         + 900 * season2
         + rng.normal(0, 600, N_MONTHS)
     )
     volume = np.clip(volume, 5_000, None)
 
-    # --- USD/LKR: long depreciation trend with a sharp 2022-style jump ---
-    usd_lkr = (
-        180
-        + 0.9 * t
-        + rng.normal(0, 1.5, N_MONTHS)
-    )
-    # Simulate the 2022 currency shock (around month index 74 = Mar 2022).
-    usd_lkr[74:] += 120
+    # USD/LKR: long depreciation trend with a sharp 2022-style jump
+    usd_lkr = 180 + 0.9 * t + rng.normal(0, 1.5, N_MONTHS)
+    usd_lkr[74:] += 120                                 # ~Mar 2022 currency shock
     usd_lkr = np.clip(usd_lkr, 150, None)
 
-    df = pd.DataFrame(
+    return pd.DataFrame(
         {
             "date": dates,
             "auction_price_usd": np.round(price, 3),
@@ -77,11 +79,43 @@ def generate_dataset() -> pd.DataFrame:
             "usd_lkr": np.round(usd_lkr, 2),
         }
     )
+
+
+def make_sample_files() -> list[Path]:
+    """Generate the dataset and write it to CSV (always) and XLSX (if possible)."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    df = generate_dataset()
+    written = []
+
+    df.to_csv(CSV_PATH, index=False)
+    written.append(CSV_PATH)
+
+    try:
+        df.to_excel(XLSX_PATH, index=False)             # needs openpyxl
+        written.append(XLSX_PATH)
+    except ModuleNotFoundError:
+        print("openpyxl not installed -> skipping .xlsx (CSV written).")
+
+    return written
+
+
+def load_dataset() -> pd.DataFrame:
+    """Load the dataset from CSV, generating the sample file first if missing."""
+    if not CSV_PATH.exists():
+        make_sample_files()
+    df = pd.read_csv(CSV_PATH, parse_dates=["date"])
     return df
 
 
 def records(df: pd.DataFrame) -> list[dict]:
     """Serialise a dataframe to JSON-friendly records (date as YYYY-MM)."""
     out = df.copy()
-    out["date"] = out["date"].dt.strftime("%Y-%m")
+    out["date"] = pd.to_datetime(out["date"]).dt.strftime("%Y-%m")
     return out.to_dict(orient="records")
+
+
+if __name__ == "__main__":
+    paths = make_sample_files()
+    print("Wrote:")
+    for p in paths:
+        print(" ", p)
