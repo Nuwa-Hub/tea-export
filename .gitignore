@@ -6,6 +6,9 @@ __pycache__/
 # Trained model artifacts (regenerate via POST /api/train). Sample data CSV/XLSX IS committed.
 backend/models/
 
+# Runtime blockchain ledger (recreated on first passport)
+backend/data/ledger.json
+
 # Node / frontend
 node_modules/
 dist/

@@ -1,1 +1,1 @@
-"""Tea Export Forecasting backend package."""
+"""AI-Powered Tea Export Intelligence Platform — backend package."""

@@ -5,6 +5,7 @@ const SERIES_LABELS = {
   auction_price_usd: "Auction price (USD/kg)",
   export_volume_kg: "Export volume (kg)",
   usd_lkr: "USD/LKR rate",
+  storage_risk: "Storage risk index",
 };
 
 function fmtDate(iso) {
@@ -32,7 +33,6 @@ export default function TrainPage({ onTrained }) {
       setLoading(false);
     }
   }
-
   useEffect(() => {
     refresh();
   }, []);
@@ -43,7 +43,7 @@ export default function TrainPage({ onTrained }) {
     try {
       await trainModels();
       await refresh();
-      onTrained?.(); // let the dashboard know fresh models exist
+      onTrained?.();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -59,65 +59,65 @@ export default function TrainPage({ onTrained }) {
       <div className="card">
         <h3>Model training</h3>
         <p className="muted">
-          Training fits one LSTM per series on the sample data and saves it to disk
-          (<code>backend/models/</code>). The dashboard then loads these saved models, so
-          forecasting is instant. You only need to retrain when the data changes.
+          Training fits four LSTMs (auction price, export volume, USD/LKR, storage risk) plus an
+          XGBoost readiness model, and saves them to <code>backend/models/</code>. Every module
+          then loads these saved models, so the platform serves instantly. Retrain only when the
+          data changes.
         </p>
 
         <div className="status-line">
           {loading ? (
             <span className="muted">Checking status…</span>
-          ) : trained ? (
-            <span className="badge ok">● Models trained</span>
           ) : (
-            <span className="badge warn">● No model trained yet</span>
-          )}
-          {trained && meta && (
-            <span className="muted">
-              &nbsp;· last trained {fmtDate(meta.trained_at)} · {meta.epochs} epochs ·{" "}
-              {meta.n_observations} months
-            </span>
+            <>
+              <span className={status?.lstm_trained ? "badge ok" : "badge warn"}>
+                ● LSTM {status?.lstm_trained ? "trained" : "not trained"}
+              </span>
+              &nbsp;&nbsp;
+              <span className={status?.xgb_trained ? "badge ok" : "badge warn"}>
+                ● XGBoost {status?.xgb_trained ? "trained" : "not trained"}
+              </span>
+              {trained && meta && (
+                <span className="muted">
+                  &nbsp;· last trained {fmtDate(meta.trained_at)} · {meta.epochs} epochs ·{" "}
+                  {meta.n_observations} months
+                </span>
+              )}
+            </>
           )}
         </div>
 
         <button className="primary" onClick={handleTrain} disabled={training}>
-          {training ? "Training… (~30s, please wait)" : trained ? "Retrain models" : "Train models"}
+          {training ? "Training… (~40-60s, please wait)" : trained ? "Retrain models" : "Train models"}
         </button>
-        {training && (
-          <p className="hint">Fitting 3 LSTMs + back-tests. This is the only slow step.</p>
-        )}
+        {training && <p className="hint">Fitting 4 LSTMs + back-tests + XGBoost. This is the only slow step.</p>}
         {error && <p className="error">⚠ {error}</p>}
       </div>
 
       {trained && meta && (
         <div className="card">
-          <h3>Back-test accuracy (saved with the model)</h3>
-          <table className="metrics">
-            <thead>
-              <tr>
-                <th>Series</th>
-                <th>MAE</th>
-                <th>RMSE</th>
-                <th>MAPE&nbsp;(%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.keys(meta.series).map((k) => {
-                const m = meta.series[k].metrics;
-                return (
-                  <tr key={k}>
-                    <td>{SERIES_LABELS[k] || k}</td>
-                    <td>{m.MAE}</td>
-                    <td>{m.RMSE}</td>
-                    <td>{m.MAPE}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="hint">
-            Measured on a held-out tail of each series (recursive multi-step forecast vs. actual).
-          </p>
+          <h3>LSTM back-test accuracy (saved with the model)</h3>
+          <div className="table-scroll">
+            <table className="metrics">
+              <thead>
+                <tr><th>Series</th><th>MAE</th><th>RMSE</th><th>MAPE&nbsp;(%)</th></tr>
+              </thead>
+              <tbody>
+                {Object.keys(meta.series).map((k) => {
+                  const m = meta.series[k].metrics;
+                  return (
+                    <tr key={k}>
+                      <td>{SERIES_LABELS[k] || k}</td>
+                      <td>{m.MAE}</td>
+                      <td>{m.RMSE}</td>
+                      <td>{m.MAPE}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint">Measured on a held-out tail of each series (recursive multi-step forecast vs. actual).</p>
         </div>
       )}
     </div>

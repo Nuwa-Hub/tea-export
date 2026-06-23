@@ -1,0 +1,95 @@
+{
+  "Russia": {
+    "max_pesticide_ppm": 0.05,
+    "max_moisture_pct": 7.0,
+    "min_grade": "BOP",
+    "required_certifications": [
+      "ISO 22000"
+    ],
+    "packaging": "Paper sack 25kg",
+    "import_tariff_pct": 12.5,
+    "demand_outlook": "Softening (sanctions/logistics)"
+  },
+  "UAE": {
+    "max_pesticide_ppm": 0.04,
+    "max_moisture_pct": 6.5,
+    "min_grade": "BOP",
+    "required_certifications": [
+      "ISO 22000",
+      "Halal"
+    ],
+    "packaging": "Foil-lined 10kg",
+    "import_tariff_pct": 5.0,
+    "demand_outlook": "Growing (re-export hub)"
+  },
+  "Iran": {
+    "max_pesticide_ppm": 0.06,
+    "max_moisture_pct": 7.5,
+    "min_grade": "OP",
+    "required_certifications": [
+      "Halal"
+    ],
+    "packaging": "Paper sack 40kg",
+    "import_tariff_pct": 20.0,
+    "demand_outlook": "Stable but FX-constrained"
+  },
+  "Iraq": {
+    "max_pesticide_ppm": 0.06,
+    "max_moisture_pct": 7.5,
+    "min_grade": "OP",
+    "required_certifications": [
+      "Halal"
+    ],
+    "packaging": "Paper sack 30kg",
+    "import_tariff_pct": 15.0,
+    "demand_outlook": "Stable"
+  },
+  "Turkey": {
+    "max_pesticide_ppm": 0.05,
+    "max_moisture_pct": 7.0,
+    "min_grade": "BOP",
+    "required_certifications": [
+      "ISO 22000"
+    ],
+    "packaging": "Carton 20kg",
+    "import_tariff_pct": 18.0,
+    "demand_outlook": "Stable (domestic competition)"
+  },
+  "China": {
+    "max_pesticide_ppm": 0.03,
+    "max_moisture_pct": 6.0,
+    "min_grade": "BOPF",
+    "required_certifications": [
+      "ISO 22000",
+      "Organic"
+    ],
+    "packaging": "Vacuum 5kg",
+    "import_tariff_pct": 10.0,
+    "demand_outlook": "Growing (premium segment)"
+  },
+  "Japan": {
+    "max_pesticide_ppm": 0.01,
+    "max_moisture_pct": 5.5,
+    "min_grade": "BOPF",
+    "required_certifications": [
+      "ISO 22000",
+      "Organic",
+      "JAS"
+    ],
+    "packaging": "Vacuum 2kg",
+    "import_tariff_pct": 8.0,
+    "demand_outlook": "Growing (high-value, strict)"
+  },
+  "Germany": {
+    "max_pesticide_ppm": 0.02,
+    "max_moisture_pct": 6.0,
+    "min_grade": "BOPF",
+    "required_certifications": [
+      "ISO 22000",
+      "Rainforest Alliance"
+    ],
+    "packaging": "Foil 5kg",
+    "import_tariff_pct": 6.0,
+    "demand_outlook": "Growing (sustainability-led)"
+  }
+}

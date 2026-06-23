@@ -1,16 +1,18 @@
 """
 LSTM forecasting engine — split into TRAIN (slow, once) and FORECAST (fast, many).
 
+Generalised to forecast any named series in config.NATIONAL_SERIES (auction price,
+export volume, USD/LKR and the derived storage-risk index).
+
 Training
-    train_all(df)  trains one LSTM per series, runs an honest hold-out back-test,
-    and SAVES each model (.keras) + its scaler (.pkl) to backend/models/, plus a
+    train_all(df) trains one LSTM per series, runs an honest train-tail back-test,
+    and SAVES each model (.keras) + scaler (.pkl) to backend/models/ plus a
     training_meta.json holding accuracy metrics and the back-test arrays.
 
 Forecasting
-    load_and_forecast(name, values, horizon)  loads the saved model + scaler and
-    only runs inference (recursive multi-step). No training -> milliseconds.
+    load_and_forecast(name, values, horizon) loads the saved model + scaler and
+    only runs recursive multi-step inference -> milliseconds.
 
-This is why the dashboard is instant: it never trains, it just loads.
 TensorFlow is imported lazily so the API process starts quickly.
 """
 from __future__ import annotations
@@ -19,22 +21,17 @@ import json
 import os
 import pickle
 from datetime import datetime, timezone
-from pathlib import Path
 
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
+from ..config import META_PATH, MODELS_DIR, NATIONAL_SERIES
+
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 
 LOOK_BACK = 12          # use the previous 12 months to predict the next
-EPOCHS = 70
+EPOCHS = 60
 EVAL_HOLDOUT = 12       # months held out at the tail to measure accuracy
-
-MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
-META_PATH = MODELS_DIR / "training_meta.json"
-
-# The three series we forecast (column name in the dataframe).
-SERIES = ["auction_price_usd", "export_volume_kg", "usd_lkr"]
 
 
 # --------------------------------------------------------------------------- #
@@ -81,7 +78,10 @@ def _recursive_forecast(model, history_scaled: np.ndarray, steps: int, look_back
     return np.array(preds)
 
 
-def _score(actual: np.ndarray, pred: np.ndarray) -> dict[str, float]:
+def score(actual: np.ndarray, pred: np.ndarray) -> dict[str, float]:
+    """MAE / RMSE / MAPE — shared with the ARIMA baseline for fair comparison."""
+    actual = np.asarray(actual, dtype="float64")
+    pred = np.asarray(pred, dtype="float64")
     err = actual - pred
     mae = float(np.mean(np.abs(err)))
     rmse = float(np.sqrt(np.mean(err**2)))
@@ -93,21 +93,20 @@ def _score(actual: np.ndarray, pred: np.ndarray) -> dict[str, float]:
 # TRAIN (slow) — called by POST /api/train
 # --------------------------------------------------------------------------- #
 def _train_one(values: list[float], look_back: int, epochs: int):
-    """Train one series; return (production_model, scaler, metrics, backtest, actual)."""
+    """Train one series; return (model, scaler, metrics, backtest, actual)."""
     series = np.asarray(values, dtype="float64").reshape(-1, 1)
     holdout = min(EVAL_HOLDOUT, max(3, len(series) // 4))
 
-    # --- Back-test with its OWN scaler fit only on the training part -------
-    # (fitting the scaler on the full series would leak test-range info).
+    # Back-test: fit a scaler + model on the training part only (no leakage).
     bt_scaler = MinMaxScaler().fit(series[:-holdout])
     bt_train = bt_scaler.transform(series[:-holdout]).flatten()
     bt_model = _build_and_train(bt_train, look_back, epochs)
     bt_pred_scaled = _recursive_forecast(bt_model, bt_train, holdout, look_back)
     bt_pred = bt_scaler.inverse_transform(bt_pred_scaled.reshape(-1, 1)).flatten()
     bt_actual = series[-holdout:].flatten()
-    metrics = _score(bt_actual, bt_pred)
+    metrics = score(bt_actual, bt_pred)
 
-    # --- Production model: scaler + LSTM fit on the FULL series ------------
+    # Production model: scaler + LSTM fit on the FULL series.
     scaler = MinMaxScaler().fit(series)
     scaled = scaler.transform(series).flatten()
     model = _build_and_train(scaled, look_back, epochs)
@@ -122,7 +121,7 @@ def _train_one(values: list[float], look_back: int, epochs: int):
 
 
 def train_all(df, look_back: int = LOOK_BACK, epochs: int = EPOCHS) -> dict:
-    """Train + save every series. Returns the training_meta dict."""
+    """Train + save every series in NATIONAL_SERIES. Returns the training_meta dict."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     meta = {
         "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -132,7 +131,7 @@ def train_all(df, look_back: int = LOOK_BACK, epochs: int = EPOCHS) -> dict:
         "series": {},
     }
 
-    for name in SERIES:
+    for name in NATIONAL_SERIES:
         model, scaler, metrics, backtest, actual = _train_one(
             df[name].tolist(), look_back, epochs
         )
@@ -155,7 +154,7 @@ def train_all(df, look_back: int = LOOK_BACK, epochs: int = EPOCHS) -> dict:
 # --------------------------------------------------------------------------- #
 def models_exist() -> bool:
     return META_PATH.exists() and all(
-        (MODELS_DIR / f"{n}.keras").exists() for n in SERIES
+        (MODELS_DIR / f"{n}.keras").exists() for n in NATIONAL_SERIES
     )
 
 

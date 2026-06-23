@@ -5,3 +5,10 @@ pandas>=2.2
 scikit-learn>=1.4
 tensorflow-cpu>=2.16
 openpyxl>=3.1
+statsmodels>=0.14
+xgboost>=2.0
+qrcode>=7.4
+
+# Optional — only used behind feature flags, not required for the offline build:
+#   anthropic   # enables the real-LLM advisor when USE_LLM=1 and ANTHROPIC_API_KEY is set
+#   pypdf       # real PDF parsing for buyer-requirement documents
